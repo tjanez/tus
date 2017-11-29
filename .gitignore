@@ -1,0 +1,3 @@
+# Ignore temporary Python files and directories
+__pycache__/
+/tus.egg-info/

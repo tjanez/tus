@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-
-# A script for computing PAR2 recovery files for backup directories.
+# A script for handling PAR2 recovery files for backup directories.
 
 # Copyright 2017 Tadej Janež.
 #
@@ -23,18 +21,39 @@ import shlex
 
 import click
 
-@click.command()
+
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
 @click.argument('backup-dir', type=click.Path(exists=True))
-def compute_par2(backup_dir):
+def compute(backup_dir):
     """Compute PAR2 recovery files for the given backup directory."""
     recovery_dir = os.path.join(backup_dir, 'recovery')
     _, _, backup_name = backup_dir.rpartition(os.sep)
     if not os.path.exists(recovery_dir):
         os.makedirs(recovery_dir)
     subprocess.run(
-        shlex.split(f'par2 create -B{backup_dir} -r5 -u {backup_name} {backup_dir}/*'),
+        shlex.split(f'par2 create -B{backup_dir} -r5 -u {backup_name} '
+                    f'{backup_dir}/*'),
         cwd=recovery_dir
     )
 
-if __name__ == '__main__':
-    compute_par2()
+
+@cli.command()
+@click.argument('backup-dir', type=click.Path(exists=True))
+def verify(backup_dir):
+    """Verify PAR2 recovery files for the given backup directory."""
+    recovery_dir = os.path.join(backup_dir, 'recovery')
+    _, _, backup_name = backup_dir.rpartition(os.sep)
+    if not os.path.exists(recovery_dir):
+        raise click.ClickException(
+            f"Recovery directory '{recovery_dir}' does not exist. You should "
+            "run 'tus-par2 compute' first!"
+        )
+    subprocess.run(
+        shlex.split(f'par2 verify -B{backup_dir} '
+                    f'{recovery_dir}/{backup_name}.par2'),
+    )
