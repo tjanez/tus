@@ -31,6 +31,8 @@ def cli():
 @click.argument('backup-dir', type=click.Path(exists=True))
 def compute(backup_dir):
     """Compute PAR2 recovery files for the given backup directory."""
+    # strip off the trailing / (if present)
+    backup_dir = backup_dir.rstrip(os.sep)
     recovery_dir = os.path.join(backup_dir, 'recovery')
     _, _, backup_name = backup_dir.rpartition(os.sep)
     if not os.path.exists(recovery_dir):
@@ -46,6 +48,8 @@ def compute(backup_dir):
 @click.argument('backup-dir', type=click.Path(exists=True))
 def verify(backup_dir):
     """Verify PAR2 recovery files for the given backup directory."""
+    # strip off the trailing / (if present)
+    backup_dir = backup_dir.rstrip(os.sep)
     recovery_dir = os.path.join(backup_dir, 'recovery')
     _, _, backup_name = backup_dir.rpartition(os.sep)
     if not os.path.exists(recovery_dir):
