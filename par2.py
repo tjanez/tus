@@ -22,6 +22,15 @@ import shlex
 import click
 
 
+def _get_names(backup_dir):
+    """Get names of backup and recovery directories and backup name."""
+    # strip off the trailing / (if present)
+    backup_dir = backup_dir.rstrip(os.sep)
+    recovery_dir = os.path.join(backup_dir, 'recovery')
+    _, _, backup_name = backup_dir.rpartition(os.sep)
+    return backup_dir, recovery_dir, backup_name
+
+
 @click.group()
 def cli():
     pass
@@ -31,10 +40,7 @@ def cli():
 @click.argument('backup-dir', type=click.Path(exists=True))
 def compute(backup_dir):
     """Compute PAR2 recovery files for the given backup directory."""
-    # strip off the trailing / (if present)
-    backup_dir = backup_dir.rstrip(os.sep)
-    recovery_dir = os.path.join(backup_dir, 'recovery')
-    _, _, backup_name = backup_dir.rpartition(os.sep)
+    backup_dir, recovery_dir, backup_name = _get_names(backup_dir)
     if not os.path.exists(recovery_dir):
         os.makedirs(recovery_dir)
     subprocess.run(
@@ -48,10 +54,7 @@ def compute(backup_dir):
 @click.argument('backup-dir', type=click.Path(exists=True))
 def verify(backup_dir):
     """Verify PAR2 recovery files for the given backup directory."""
-    # strip off the trailing / (if present)
-    backup_dir = backup_dir.rstrip(os.sep)
-    recovery_dir = os.path.join(backup_dir, 'recovery')
-    _, _, backup_name = backup_dir.rpartition(os.sep)
+    backup_dir, recovery_dir, backup_name = _get_names(backup_dir)
     if not os.path.exists(recovery_dir):
         raise click.ClickException(
             f"Recovery directory '{recovery_dir}' does not exist. You should "
