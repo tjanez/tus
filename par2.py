@@ -37,15 +37,18 @@ def cli():
 
 
 @cli.command()
+@click.option('--threads', '-t', type=int, default=os.cpu_count(),
+              help="Number of CPU threads to use for main processing.",
+              show_default=True)
 @click.argument('backup-dir', type=click.Path(exists=True))
-def compute(backup_dir):
+def compute(threads, backup_dir):
     """Compute PAR2 recovery files for the given backup directory."""
     backup_dir, recovery_dir, backup_name = _get_names(backup_dir)
     if not os.path.exists(recovery_dir):
         os.makedirs(recovery_dir)
     subprocess.run(
-        shlex.split(f'par2 create -B{backup_dir} -r5 -u {backup_name} '
-                    f'{backup_dir}/*'),
+        shlex.split(f'par2 create -B{backup_dir} -r5 -u -t{threads} '
+                    f'{backup_name} {backup_dir}/*'),
         cwd=recovery_dir
     )
 
