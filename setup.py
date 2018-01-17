@@ -10,6 +10,7 @@ setup(
     entry_points={
         'console_scripts': [
             'tus-par2 = par2:cli',
+            'tus-partclone = partclone:cli',
             'tus-sessionstore = sessionstore_geturls:main'
         ],
     },
