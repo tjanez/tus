@@ -43,24 +43,32 @@ class _StyleAdapter(logging.LoggerAdapter):
         return _BraceString(msg), kwargs
 
 
-def _setup_logging(log_file):
-    """Set up logging to the given file."""
+def _setup_logging(log_file=None):
+    """Set up logging.
+
+    If ``log_file`` is given, configure logging to the given file.
+
+    """
     global logger
 
     logger.setLevel(logging.DEBUG)
-    # Define a Handler which writes DEBUG messages or higher to log_file.
-    log_file = logging.FileHandler(log_file, mode='w')
-    log_file.setLevel(logging.DEBUG)
-    # Set custom log messages formatter.
+
+    # Create a custom log messages formatter.
     formatter = logging.Formatter(
         fmt='{asctime} {levelname:8} {message}',
         datefmt='%Y-%m-%d %H:%M:%S',
         style='{'
     )
-    # Tell the handler to use this format.
-    log_file.setFormatter(formatter)
-    # Add the handler to the root logger.
-    logger.addHandler(log_file)
+
+    # Configure logging to a file if log file is given
+    if log_file:
+        # Define a Handler which writes DEBUG messages or higher to log_file.
+        log_file = logging.FileHandler(log_file, mode='w')
+        log_file.setLevel(logging.DEBUG)
+        # Tell the handler to use this format.
+        log_file.setFormatter(formatter)
+        # Add the handler to the root logger.
+        logger.addHandler(log_file)
 
     # Use str.format() syntax for logging messages.
     logger = _StyleAdapter(logger)
