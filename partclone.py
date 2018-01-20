@@ -15,8 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import fnmatch
 import logging
 import os
+import signal
 import shlex
 import subprocess
 import sys
@@ -219,9 +221,158 @@ def backup(archive_size, source_device, backup_dir):
 
 
 @cli.command()
-def restore():
+@click.option('--log-file', '-l', type=click.Path(exists=False),
+              help="Path to log file.")
+@click.argument('backup-file', type=click.Path(exists=True))
+@click.argument('destination-device', type=click.Path(exists=False))
+def restore(log_file, backup_file, destination_device):
     """Restore the given Partclone backup to the given partition."""
-    pass
+    command_name = os.path.basename(sys.argv[0])
+
+    # Check if running as root.
+    # TODO: Convert this to a decorator.
+    if not os.geteuid() == 0:
+        raise click.ClickException(
+            "The {} script should be run as root!".format(command_name)
+        )
+
+    # TODO: Check if all commands are installed.
+
+    _setup_logging(log_file)
+    logger.info("Starting {0}...", command_name)
+
+    # Get all backup files.
+    backup_dir = os.path.dirname(backup_file)
+    backup_name, _ = os.path.splitext(os.path.basename(backup_file))
+    backup_files = sorted(
+        [os.path.join(backup_dir, bf) for bf in os.listdir(backup_dir)
+         if fnmatch.fnmatch(bf, backup_name + '.*')]
+    )
+    logger.info("Discovered the following backup files:")
+    for backup_file in backup_files:
+        logger.info("- {0}", backup_file)
+
+    # TODO: Guess the filesystem type of the backed up partition.
+    fs_type = 'ext4'
+
+    if not destination_device.startswith('/dev/'):
+        error_msg = (
+            "Destination device does not start with '/dev/'.\n"
+            "You should provice a destination device that starts with '/dev/'!"
+        )
+        logger.error(error_msg)
+        raise click.ClickException(error_msg)
+
+    click.confirm(
+        f"{command_name} is about to restore the contents of a Partclone "
+        f"backup to {destination_device}.\nThis will ERASE the contents of "
+        f"{destination_device}!!!\nAre you sure you want to proceed?",
+        abort=True,
+    )
+
+    cat_command = [
+        'cat',
+        *backup_files,
+    ]
+    gzip_command = [
+        'gzip',
+        '--decompress',
+        '--to-stdout',
+    ]
+    partclone_command = [
+        f'partclone.{fs_type}',
+        '--restore',
+        '--source', '-',
+        '--output', destination_device,
+    ]
+
+    logger.info("Running restore command as a series of the following piped "
+                "commands:")
+
+    processes = []
+
+    logger.info("- {0}", cat_command)
+    process_cat = subprocess.Popen(
+        cat_command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    processes.append(process_cat)
+
+    logger.info("- {0}", gzip_command)
+    process_gzip = subprocess.Popen(
+        gzip_command,
+        stdin=process_cat.stdout,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    processes.append(process_gzip)
+
+    logger.info("- {0}", partclone_command)
+    # TODO: Capture Partclone's stderr and display it asynchrously at the same
+    # time.
+    process_partclone = subprocess.Popen(
+        partclone_command,
+        stdin=process_gzip.stdout,
+        stdout=subprocess.PIPE,
+    )
+    processes.append(process_partclone)
+
+    try:
+        # Allow cat process to receive a SIGPIPE if gzip exits before cat.
+        process_cat.stdout.close()
+        # Allow gzip process to receive a SIGPIPE if Partclone exits before
+        # gzip.
+        process_gzip.stdout.close()
+        # Interact with the Partclone process (send data to stdin, read data
+        # from stdout/stderr, wait for process to terminate).
+        partclone_stdout, _ = process_partclone.communicate()
+    except:
+        for p in processes:
+            p.kill()
+            p.wait()
+        raise
+    for p in processes:
+        # Wait for the process to finish.
+        retcode = p.poll()
+        # Get process' stderr.
+        stderr = None
+        if p.stderr is not None:
+            stderr = p.stderr.read().decode('utf-8')
+
+        if retcode and retcode != 0:
+            if retcode < 0:
+                # Negative return code means command was terminated by a
+                # signal.
+                signame = signal.Signals(-retcode).name
+                exception_msg = (
+                    f"Command {p.args} was terminated by {signame} signal."
+                )
+            else:
+                exception_msg = (
+                    f"Command {p.args} returned non-zero exit status "
+                    f"{retcode}."
+                )
+            if stderr:
+                exception_msg += f"\nCommand's stderr:\n{stderr}"
+            logger.error(exception_msg)
+            # If the command was terminated by SIGPIPE signal, we want to
+            # continue and report the error message of the subsequent command
+            # that stopped reading from the pipe.
+            if retcode != -13:
+                raise click.ClickException(exception_msg)
+        # TODO: Handle Partclone's lack of proper setting of return code to
+        # non-zero on some errors and manually detect unsuccessful runs.
+        # However, we need to be able to asynchronously capture Partclone's
+        # stderr first.
+        # if p == process_partclone:
+        #     if 'unset_name' in stderr:
+        #         raise click.ClickException(
+        #             f"Command {p.args} returned zero exit status, however, we "
+        #             "believe it didn't finish successfully.\n"
+        #             f"Command's stderr:\n{stderr}"
+        #     )
+    logger.info("Successfully finished running restore command.")
 
 
 @cli.command()
