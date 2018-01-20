@@ -15,3 +15,8 @@ directory in editable mode:
 ```
 pip3 install --user --editable <path-to-tus-directory>
 ```
+
+License
+-------
+
+GPLv3 or any later version
