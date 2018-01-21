@@ -76,41 +76,9 @@ def _setup_logging(log_file=None):
     logger = _StyleAdapter(logger)
 
 
-@click.group()
-def cli():
-    pass
-
-
-@cli.command()
-@click.option('--archive-size', '-s', type=int, default=4096,
-              help="Size (in MiBs) of the gzipped partition backup parts.",
-              show_default=True)
-@click.argument('source-device', type=click.Path(exists=True))
-@click.argument('backup-dir', type=click.Path(exists=False))
-def backup(archive_size, source_device, backup_dir):
+def _backup_partition(source_device, backup_dir, archive_size):
     """Backup the given partition using Partclone."""
-    # Check if running as root.
-    # TODO: Convert this to a decorator.
-    if not os.geteuid() == 0:
-        raise click.ClickException(
-            "The {} script should be run as root!".format(sys.argv[0])
-        )
-
-    # TODO: Check if all commands are installed.
-
-    # Create backup directory.
-    try:
-        os.makedirs(backup_dir)
-    except OSError:
-        raise click.ClickException(
-            f"Backup directory '{backup_dir}' exists!\n"
-            "You should provide a directory path that doesn't exist yet."
-        )
-
-    log_file = os.path.join(backup_dir, os.path.basename(sys.argv[0]) + '.log')
-    _setup_logging(log_file)
-    logger.info("Starting {0}...", os.path.basename(sys.argv[0]))
-
+    logger.info("Backing up {0}...", source_device)
     # TODO: Guess the filesystem of the source device.
     fs_type = 'ext4'
 
@@ -125,10 +93,10 @@ def backup(archive_size, source_device, backup_dir):
 
     partclone_command = [
         f'partclone.{fs_type}',
-        '--logfile', f'{backup_dir}/partclone.log',
+        '--logfile', f'{backup_dir}/partclone-{source_device_name}.log',
         '--buffer_size', '10485670',
         '--clone',
-        '--source', f'{source_device}',
+        '--source', source_device,
         '--output', '-',
     ]
     pigz_command = [
@@ -217,7 +185,55 @@ def backup(archive_size, source_device, backup_dir):
         #             "believe it didn't finish successfully.\n"
         #             f"Command's stderr:\n{stderr}"
         #     )
-    logger.info("Successfully finished running backup command.")
+
+    logger.info("Successfully finished backing up {0}...", source_device)
+
+
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
+@click.option('--backup-dir', '-b',
+              type=click.Path(file_okay=False, writable=True),
+              required=True,
+              help="Directory where to store the backup.")
+@click.option('--archive-size', '-s', type=int, default=4096,
+              help="Size (in MiBs) of the gzipped partition backup parts.",
+              show_default=True)
+@click.argument('source-devices', type=click.Path(exists=True), nargs=-1)
+def backup(backup_dir, archive_size, source_devices):
+    """Backup the given partition(s) using Partclone."""
+    command_name = '{} backup'.format(os.path.basename(sys.argv[0]))
+
+    # Check if running as root.
+    # TODO: Convert this to a decorator.
+    if not os.geteuid() == 0:
+        raise click.ClickException(
+            "The {} script should be run as root!".format(sys.argv[0])
+        )
+
+    # TODO: Check if all commands are installed.
+
+    # Create backup directory.
+    try:
+        os.makedirs(backup_dir)
+    except OSError:
+        raise click.ClickException(
+            f"Backup directory '{backup_dir}' exists!\n"
+            "You should provide a directory path that doesn't exist yet."
+        )
+
+    log_file = os.path.join(backup_dir,
+                            command_name.replace(' ', '-') + '.log')
+    _setup_logging(log_file)
+    logger.info("Starting {0}...", command_name)
+
+    for source_device in source_devices:
+        _backup_partition(source_device, backup_dir, archive_size)
+
+    logger.info("Successfully finished running {0} command.", command_name)
 
 
 @cli.command()
@@ -227,7 +243,7 @@ def backup(archive_size, source_device, backup_dir):
 @click.argument('destination-device', type=click.Path(exists=False))
 def restore(log_file, backup_file, destination_device):
     """Restore the given Partclone backup to the given partition."""
-    command_name = os.path.basename(sys.argv[0])
+    command_name = '{} restore'.format(os.path.basename(sys.argv[0]))
 
     # Check if running as root.
     # TODO: Convert this to a decorator.

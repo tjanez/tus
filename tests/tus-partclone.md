@@ -21,8 +21,9 @@ export TUS_DEST_DEV=<an-empty-device-for-restore>
 ### Create a backup with:
 
 ```
-sudo ~/.virtualenvs/tus/bin/tus-partclone backup --archive-size 100 \
-  "${TUS_SOURCE_DEV}" "${TUS_BACKUP_DIR}"
+sudo ~/.virtualenvs/tus/bin/tus-partclone backup \
+    --backup-dir "${TUS_BACKUP_DIR}" --archive-size 100 \
+    "${TUS_SOURCE_DEV}"
 ```
 
 ### Restore the backup with:
