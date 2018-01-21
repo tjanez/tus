@@ -1,17 +1,17 @@
-from setuptools import setup
+from setuptools import find_packages, setup
 
 setup(
     name='tus',
     version='0.1',
-    py_modules=['par2'],
+    packages=['tus'],
     install_requires=[
         'Click',
     ],
     entry_points={
         'console_scripts': [
-            'tus-par2 = par2:cli',
-            'tus-partclone = partclone:cli',
-            'tus-sessionstore = sessionstore_geturls:main'
+            'tus-par2 = tus.par2:cli',
+            'tus-partclone = tus.partclone:cli',
+            'tus-sessionstore = tus.sessionstore_geturls:main'
         ],
     },
 )
